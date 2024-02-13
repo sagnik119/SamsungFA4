@@ -1,0 +1,70 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[left=0.680in, right=0.620in, bottom = 1in, top=0.7in]{geometry}
+\usepackage{url,amssymb,threeparttable,multirow,booktabs, tabularx}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\usepackage{algpseudocode} 
+\usepackage{algorithm} 
+
+
+\captionsetup[table]{font=footnotesize}
+\captionsetup[figure]{font=footnotesize}
+
+
+\begin{document}
+
+\title{Optimum Multiuser Modulation and Coding for Energy-Efficient Extended Reality (XR) Support\\
+}
+
+\author{
+\IEEEauthorblockN{Sagnik Bhattacharya\textsuperscript{1}, Kamyar Rajabalifardi\textsuperscript{1}, Rohan Pote\textsuperscript{2}, Hyukjoon Kwon\textsuperscript{2}, Dongwoon Bai\textsuperscript{2}, John M. Cioffi\textsuperscript{1}}
+
+\IEEEauthorblockA{\textsuperscript{1}Dept. of Electrical Engineering, Stanford University, Stanford, CA, USA} 
+
+\IEEEauthorblockA{\textsuperscript{2}Samsung Semiconductors, San Diego, CA, USA} 
+
+\IEEEauthorblockA{
+% \textit{Dept. of Electrical Engineering, Stanford University, CA, U.S.A} \\
+Emails: \{sagnikb, kfardi, cioffi\}@stanford.edu, \{rohan.pote, hyukjoon.k, dongwoon.bai\}@samsung.com}
+}
+
+\maketitle
+\vspace{-40pt}
+
+\begin{abstract}
+In the ever-evolving landscape of Extended Reality (XR)-based distributed rendering, the scenario where the number of user antennas exceeds the number of access point (AP) antennas presents a low-rank channel problem. This often arising situation demands high data rates (upto 500 Mbps) and low power consumption. Current Wi-Fi solutions using OFDM-based power allocation fall short in addressing these requirements efficiently. This paper introduces a novel non-linear Generalized Decision Feedback Equalizer (GDFE) based algorithm to optimize the power allocation to elevate data rates and minimize energy usage,  especially in low rank scenarios. Incorporating time-sharing techniques, the proposed algorithm offers substantial improvements over existing standards. Extensive experimental validations highlight its ability to significantly outperform contemporary Wi-Fi methods, marking a step forward in enabling advanced XR applications.
+\end{abstract}
+
+\begin{IEEEkeywords}
+extended reality (XR), augmented reality (AR), generalized decision feedback equalizer (GDFE), multiple access channel (MAC), time sharing
+\end{IEEEkeywords}
+
+% \input{intro}
+\input {intro_2}
+
+% \input{related}
+\input{related_2}
+
+% \input{methodology}
+% \input{methodology_2}
+\input{methodology_3}
+
+\input{performance}
+
+\input{conclusion}
+
+\footnotesize
+\bibliographystyle{IEEEtran}
+\bibliography{refs.bib}
+
+\end{document}
