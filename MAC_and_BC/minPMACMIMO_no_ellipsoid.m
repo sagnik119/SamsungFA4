@@ -1,128 +1,98 @@
-% function [Eun, theta, bun, FEAS_FLAG, bu_a, info] = minPMAC(H, bu, w, cb)
-%
-% This main function contains ellipsoid method part and calls direclty or 
-%   indirectly 6 other functions.  minPMAC uses no CVX.  Another routine
-%   minPMAC_cvx uses cvx and usually runs longer.  However, these scalar 
-%   minPMAC programs assume each user has Lxu = 1; 
-%   There is a CVX-using program minPMACMIMO that allows variable Lxu.
+% function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lxu, bu_min, w, cb)
 %
 % INPUTS: 
-% H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas, 
-%     U = number of users and N = number of tones.
-%
+%  H(:,u,n): Ly x U x N channel matrix. Ly = number of receiver antennas, 
+%            U = number of users and N = number of tones.
+% 
 %     If the channel is real-bbd (cb=2), minPMAC realizes user data rates 
 %     over the lower half of the tones (or equivalently, the positive
-%     freqs), and directly corresponds to the input bu user-data rate vector.
-%     N is the number of tones actually transmitted (so corresponds to a 2N
-%     size FFT when cb=2).
-%
-%     By constast if cb=1 (cplx bbd), minPMAC realizes user data rates
-%     over all tones, but uses the same core optmization, so the data rate 
-%     is halved internal to the program, realizing that half bu rate on the 
-%     lower tones, because the designer (cb=1) wants it over all tones.
-%     N is the number of tones actually transmitted (so corresponds to a N
-%     size full-complex FFT when cb=1).
-%     
+%     freqs), and directly corresponds to the input bu_min user-data rate vector.
+% 
+%     By constast if cb=1 (cplx bbd), minPMAC realizes user data rates over
+%     all tones, but uses the same real-bbd core optmization that doubles the
+%     number of tones with an equivalent-gain set, so this program halves
+%     the data rate internally and realizes that half bu_min rate on the 
+%     lower tones, which is the input set for which results are reported.
+% 
+% Lxu:  1 x 1 or 1 x U vector containing each users' number of
+%       transmit antennas. If Lxu is 1 x 1, each user has Lxu antennas.
+% 
 % bu_min: U x 1 vector containing the target rates for all the users.
-%
-% w:  U x 1 vector containing the weights for each user's power.
-%     
+% 
+% w:  U x 1 vector containing the weights for each user's energy.
+% 
 % cb: =1 if H is complex baseband, and cb=2 if H is real baseband.
-%
-% OUTPUTS:
-% Eun:    U by N energy distribution that minimizes the weighted-sum energy. 
-%       E(u,n) is user u's energy allocation on tone n.
-% theta:the optimal U by 1 dual variable vector containing optimal weights
-%     of rates. Theta determines the decoding order. Largest theta is
-%     decoded last, and smallest first.
-% bun,   U by N bit distributions for all users.
-% FEAS_FLAG: indicator of achievability. 
+%   Outputs:
+%       - FEAS_FLAG: indicator of achievability. 
 %           FEAS_FLAG=1 if the target is achieved by a single ordering; 
 %           FEAS_FLAG=2 if the target is achieved by time-sharing
-% bu_a: U-by-1 vector showing achieved sum rate of each user. 
-% info: various length output depending on FEAS_FLAG
+%       - bu_a: U-by-1 vector showing achieved sum rate of each user. 
+%       - info: various length output depending on FEAS_FLAG
 %           --if FEAS_FLAG=1: 1 x 4 cell array containing
 %               {Rxxs, Eun, bun, theta} corresponds to the single vertex
 %               there are no equal-theta user sets in this case
 %           --if FEAS_FLAG=2: 1-x 6 cell array, with each row representing
 %               a time-shared vertex {Rxxs, Eun, bun, theta, frac}
 %               there are numclus equal-theta user sets in this case.
-%
-%  info's row entries in detail (one row for each vertex shared
+% 
+%      info's row entries in detail (one row for each vertex shared
+%       - Rxxs: U-by-N cell array containing Rxx(u,n)'s if Lxu is a
+%           length-U vector; or Lxu-by-Lxu-by-U-by-N tensor if Lxu is a
+%           scalar. If the rate target is infeasible, output 0.
 %       - Eun:  U-by-N matrix showing users' transmit energy on each tone.
 %           If infeasible, output 0.
 %       - bun: U-by-N matrix showing users' rate on each tone. If
 %           infeasible, output 0.
 %       - theta: U-by-1 Lagrangian multiplier w.r.t. target rates
-%       - order: produces the order from left(best) to right for vertex
 %       - frac: fraction of dimensions for each vertex in time share (FF =2
 %           ONLY)
 %       - cluster: index (to which cluster the user belongs; 0 means no
 %           cluster)
 %
-% Subroutines called directly are
-%       startEllipse.m
-%       Lag_dual_f.m
-%   and indirectly
-%       minPtone.m
-%       Hessian.m
-%       eval_f.m
-%       fmwaterfill_gn.,      
-%
-% ***************************************************************************
-function [Eun, theta, bun, FEAS_FLAG, bu_a, info] = minPMAC(H, bu_min, w, cb)
-
-tic;
+% Functions called are
+%       startEllipse_var_Lxu
+%       minPtoneMIMO
+% *********************************************************************
+function [FEAS_FLAG, bu_a, info] = minPMACMIMO(H, Lxu, bu_min, w, cb)
+tstart=tic;
 bu_min=1/(3-cb)*bu_min;
 err=1e-9;
-conv_tol = 1e-2;% error tolerance
-
-count = 0;                               
-[Ly, U, N] = size(H);
+conv_tol = 1e-1;
+[Ly, ~, N] = size(H);
+U = length(w);
+% Yun, I don't think these next 3 lines change anything? 
+  if N == 1
+    H = reshape(H,Ly,[],1);
+  end
 w = reshape(w, U, 1);
 bu_min = reshape(bu_min, U, 1);
+
+% initialize
+count = 0;
 bun = zeros(U,N);
 Eun = zeros(U,N);
+Rxxs = cell(1,N);
+[A, theta] = startEllipse_var_Lxu(H, Lxu, bu_min, w);
 
-[A, g, w] = startEllipse(H, bu_min, w);         % starting ellipsoid 
-theta = g;
+bu_min = bu_min*log(2);
 
-bu_min = bu_min  * log(2);                       % conversion from bits to nuts 
+  if length(Lxu) == 1
+    Lxu = ones(1,U)*Lxu;
+    UNIFORM_FLAG = 1;
+  end
 
-while 1
-    % disp(count)
-    % Ellipsoid method starts here
-    [~, bun, Eun] = Lag_dual_f(H, theta, w, bu_min);
-    g = sum(bun,2) - bu_min;                   % sub-gradient
-    
-    
-    if sqrt(g' * A * g) <= err           % stopping criteria
-        break
-    end
-                                         % Updating the ellipsoid
-    tmp = A*g / sqrt(g' * A * g);
-    theta = theta - 1 / (U + 1) * tmp;
-    
-    A = U^2 / (U^2 - 1) * (A - 2 / (U + 1) * (tmp * tmp'));
-    
-    ind = find(theta < zeros(U,1));
-    
-    while ~isempty(ind)                  % This part is to make sure that theta is feasible,
-        g = zeros(U,1);                  % it was not covered in the lecture notes and you may skip this part
-        g(ind(1)) = -1;
-        tmp = A * g / sqrt(g' * A * g);
-        theta = theta - 1 / (U + 1) * tmp;
-        A = U^2 / (U^2 - 1) * (A - 2 / (U + 1) * (tmp * tmp'));
-        ind = find(theta < zeros(U,1));
-    end   
-    count = count+1;
-end
 
-bun = (3-cb)*bun /log(2);                            % conversion from nats to bits
-  
-%-------------------------------  
+
+% if max(Lxu) == 1
+%     Rxxs = Eun;
+% end
+bun = (3-cb)*bun /log(2);
 bu_min = (3-cb)*bu_min /log(2);
 bu_a=sum(bun,2);
+
+
+
+
 
 
 
@@ -138,10 +108,19 @@ bu_a=bu_a(Itheta);
 bun=bun(Itheta,:);
 Eun=Eun(Itheta,:);
 bu_min=bu_min(Itheta);
-H=H(:,Itheta,:);
-
-
-
+index_end = cumsum(Lxu);
+index_start = [1, index_end(1:end-1)+1];
+hidx = [];
+for i = Itheta'
+    hidx = [hidx, index_start(i):index_end(i)];
+end
+Lxu = Lxu(Itheta);
+index_end = cumsum(Lxu);
+index_start = [1, index_end(1:end-1)+1];
+H=H(:,hidx,:);
+for tone=1:N
+    Rxxs{tone}= Rxxs{tone}(Itheta);
+end
 
 % --------------  SIMPLE CASE OF NO EQUAL-THETA USERS -------------
 % This next section is implemented only if there are no equal-theta users
@@ -155,9 +134,13 @@ if isempty(find(abs(diff(theta)) <= 1e-5*min(theta), 1))
     theta = theta(Jtheta);
     bun=bun(Jtheta,:);
     Eun=Eun(Jtheta,:);
+    for tone=1:N
+       Rxxs{tone}= Rxxs{tone}(Jtheta);
+    end
     % make table and exit
-    info = table(bu_v, {Eun}, {bun}, {theta}, {Itheta(end:-1:1)}); % detailed info of boundary vertices
-    info.Properties.VariableNames(2:end) = {'Eun' 'bun' 'theta', 'order'};
+    info = table(bu_v, Rxxs, {Eun}, {bun}, {theta}, {Itheta(end:-1:1)}); % detailed info of boundary vertices
+    info.Properties.VariableNames(2:end) = {'Rxxs', 'Eun', 'bun', 'theta', 'order'};
+    toc(tstart)
     return  % ARRIVE HERE AND SIMPLE CASE IS DONE.PROGRAM OVER
 end
 %
@@ -223,8 +206,8 @@ initialbun = bun;
 firstvertices = de2bi(0:2^U-1).*initialbu_v;
 
 % The vertices will be stored in a table that is indexed by bu_v 
-initialinfo = table(bu_v, {Eun}, {bun}, {theta}, {U:-1:1}); % detailed info of boundary vertices
-initialinfo.Properties.VariableNames(2:end) = {'Eun' 'bun' 'theta', 'order'};
+initialinfo = table(bu_v, Rxxs, {Eun}, {bun}, {theta}, {U:-1:1}); % detailed info of boundary vertices
+initialinfo.Properties.VariableNames(2:end) = {'Rxxs' 'Eun' 'bun' 'theta' 'order'};
 
 % ----- For each cluster -----------
 for jdx=1:numclus
@@ -233,7 +216,7 @@ for jdx=1:numclus
         cumrateinit = zeros(1, N);
         for n = 1:N
             for i = 1:set_thetaeq(1)-1
-                Sinit(:,:,n) = Sinit(:,:,n) + H(:,i,n)*Eun(i,n)*H(:,i,n)';
+                Sinit(:,:,n) = Sinit(:,:,n) + H(:,index_start(i):index_end(i),n)*Rxxs{n}{i}*H(:,index_start(i):index_end(i),n)';
             end
             cumrateinit(n) = (1/cb)*real(log2(det(Sinit(:,:,n))));
         end
@@ -241,7 +224,7 @@ for jdx=1:numclus
     else
         for n = 1:N
             for i = set_thetaeq(jdx-1):set_thetaeq(jdx-1)+sizeclus(jdx)-1
-                Sinit(:,:,n) = Sinit(:,:,n) + H(:,i,n)*Eun(i,n)*H(:,i,n)';
+                Sinit(:,:,n) = Sinit(:,:,n) + H(:,index_start(i):index_end(i),n)*Rxxs{n}{i}*H(:,index_start(i):index_end(i),n)';
             end
             cumrateinit(n) = (1/cb)*real(log2(det(Sinit(:,:,n))));
         end
@@ -271,7 +254,7 @@ for jdx=1:numclus
             S = Sinit(:,:,n);
             for u = u_range
                 u_or = order(jdx, u);
-                S = S + H(:,u_or,n)*Eun(u_or,n)*H(:,u_or,n)';
+                S = S + H(:,index_start(u_or):index_end(u_or),n)*Rxxs{n}{u_or}*H(:,index_start(u_or):index_end(u_or),n)';
                 cumrate(rel_idx,n) = (1/cb)*real(log2(det(S)));
                 rel_idx = rel_idx + 1;
             end
@@ -283,7 +266,7 @@ for jdx=1:numclus
 
         bd_V = bd_V + 1;
         bd_vertices_extend = [bd_vertices; bu_v(u_range)];
-        known_vertices = [known_vertices; {bu_v, {Eun}, {bun}, {theta}, {order(idx,end:-1:1)}}];
+        known_vertices = [known_vertices; {bu_v, Rxxs, {Eun}, {bun}, {theta}, {order(idx,end:-1:1)}}];
         vertices = [vertices; de2bi(0:2^sizeclus(jdx)-1).*bu_v(u_range)];
         tess = convhulln(vertices);
         vertices = vertices(unique(tess),:);
@@ -318,9 +301,9 @@ end
 
 try
     info = Big_info;
-catch ME
-    info = info;
-end 
+catch
+    
+end
 bd_V = size(info.bu_v, 1);
 
 % ----------- RESTORE ORIGINAL ORDER TO ALL ----------------
@@ -346,14 +329,14 @@ tmporder = cell2mat(info.order);
 tmporder = Itheta(tmporder);
 info.order = mat2cell(tmporder, ones(1,bd_V), U);
 
-bun = zeros(U, N);
-for i = 1:numel(info.frac)
-    bun = bun + squeeze(info.bun{i})*info.frac(i);
+for tone=1:N
+    Rxxs{tone}= Rxxs{tone}(Jtheta);
+end
+for u=1:U
+    for n=1:N
+        info.Rxxs{n}{u}=Rxxs{n}{u};
+    end
+end
+toc(tstart)
 end
 
-elapsedTime = toc;
-fprintf('Elapsed time for minPMAC: %.2f seconds\n', elapsedTime);
-
-end
-
-    

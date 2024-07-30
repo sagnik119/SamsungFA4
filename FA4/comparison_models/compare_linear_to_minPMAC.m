@@ -76,24 +76,22 @@ num_samples = 1;
 
 %% Define ranges or sets for input parameters
 channel_types = 'B';        
-users_range = 3; % No. of users
-N_tx = 1; % no. of antennas per user, as of now, fixed to 1, otherwise use minPMAC_MIMO
-N_rx_range = 2; % No. of antennas at AP
+users_range = 8; % No. of users
+N_tx = 1; % no. of antennas per user
+N_rx_range = 4; % No. of antennas at AP
 index_range = 1:5000; % channel sample index
 dist_range = [1,5]; % have to generate random float value between 1m and 5m
 fc = 2.4e9; % carrier frequency
 fft_length_range = 2.^[6]; % range of FFT lengths
-noise_var = 1.0/9800000;%1.0/1000000000;%1.0/30000; % noise variance
-
+noise_var = 1.0/9800000; 
 bu_min_single_user_single_tone_range = 1:5; % to be multiplied by FFT length to get total energy per user
 w_single_user_range = 1;
 cb = 1; % complex baseband channel
 
 % fixing samples to monitor average data statistics
-index = [1, 2, 3] +100;
+index = 1:users_range;
 % get_fading parameters
-dist = [3, 3, 3];
-
+dist = ones(1, users_range) * 3;
 
 %% Preallocate storage for data samples
 data_samples = struct();
@@ -144,7 +142,15 @@ while idx <= num_samples
         for user=1:num_users
             [h_user, t_dly, t_dly_10ns] = get_channel(channel_type, N_tx, ...
                 N_rx, index(user));
-            
+
+            h_user_resampled = zeros(N_rx, N_tx, 9);
+            for rx = 1:N_rx
+                for tx = 1:N_tx
+                    h_user_resampled(rx,tx,:) = channel_resample(h_user(rx, tx,:), 100e6, 4,5, 9, 0);
+                end
+            end
+            h_user = h_user_resampled;
+
             % [temp, ~,~] = size(h_user);
             % for tempp = 1:temp
             %     h_user(tempp,1,:) = channel_resample(h_user(tempp,1,:), 100e6, 4, 5, 9, 0);
@@ -156,10 +162,11 @@ while idx <= num_samples
             h(:, (user-1)*N_tx+1:user*N_tx, :) = h_user;
         end
     
-        % FFT
+        %  FFT
         H = fft(h, fft_length, 3);
+         
     
-        % Gathering linear receiver data rates
+        % % Gathering linear receiver data rates
         Lxu = ones(1, num_users);
         Rnn = repmat(eye(N_rx), [1, 1, fft_length]);
         Eun = eye(num_users);
@@ -168,16 +175,20 @@ while idx <= num_samples
             Lxu , Rnn, cb);
 
         % Solo minPMAC without linear only
-        bu_a_lin = [300, 300, 300];
+        % bu_a_lin = [300, 300, 300];
     
         % fprintf ("Starting minPMAC\n");
         % Applying minPMAC on generated channel with random values
+
+        [FEAS_FLAG2, bu_a2, info2] = minPMAC_reformulated(H/sqrt(noise_var), ...
+            bu_a_lin, w, cb);
+
         [Eun, theta, bun, FEAS_FLAG, bu_a, info] = minPMAC(H/sqrt(noise_var), ...
             bu_a_lin', ... % bit
             w', cb);
-    
-    
+
         % fprintf ("minPMAC finished\n");
+
     
         % fprintf ("Starting maxRMAC\n");
         % Applying maxRMAC on generated channel with random values
@@ -186,46 +197,46 @@ while idx <= num_samples
         % fprintf ("maxRMAC finished\n");
     
         % Store inputs and outputs
-        data_samples(idx).N_tx = N_tx;
-        data_samples(idx).fc = fc;
-        data_samples(idx).num_taps = size(t_dly, 2);
-        data_samples(idx).num_users = num_users;
-        data_samples(idx).channel_type = channel_type;
-        data_samples(idx).N_rx = N_rx;
-        data_samples(idx).sample_index = index;
-        data_samples(idx).dist = dist;
-        data_samples(idx).fft_length = fft_length;
-        % data_samples(idx).bu_min = bu_min;
-        data_samples(idx).w = w;
-        data_samples(idx).h = h;
-        data_samples(idx).H = H;
-        data_samples(idx).Eun = Eun ;
-        data_samples(idx).theta = theta;
-        data_samples(idx).bun = bun  ;
-        data_samples(idx).FEAS_FLAG = FEAS_FLAG;
-        data_samples(idx).bu_a = bu_a ;
-        data_samples(idx).info = info;
-        data_samples(idx).bu_a_lin = bu_a_lin ;
-        data_samples(idx).b_sum_lin = bsum_lin ;
-        data_samples(idx).b_sum = bsum ;
-        data_samples(idx).bun_lin = bun_lin ;
-        data_samples(idx).Rxx = Rxx;
+        % data_samples(idx).N_tx = N_tx;
+        % data_samples(idx).fc = fc;
+        % data_samples(idx).num_taps = size(t_dly, 2);
+        % data_samples(idx).num_users = num_users;
+        % data_samples(idx).channel_type = channel_type;
+        % data_samples(idx).N_rx = N_rx;
+        % data_samples(idx).sample_index = index;
+        % data_samples(idx).dist = dist;
+        % data_samples(idx).fft_length = fft_length;
+        % % data_samples(idx).bu_min = bu_min;
+        % data_samples(idx).w = w;
+        % data_samples(idx).h = h;
+        % data_samples(idx).H = H;
+        % % data_samples(idx).Eun = Eun ;
+        % % data_samples(idx).theta = theta;
+        % % data_samples(idx).bun = bun  ;
+        % % data_samples(idx).FEAS_FLAG = FEAS_FLAG;
+        % % data_samples(idx).bu_a = bu_a ;
+        % % data_samples(idx).info = info;
+        % data_samples(idx).bu_a_lin = bu_a_lin ;
+        % data_samples(idx).b_sum_lin = bsum_lin ;
+        % data_samples(idx).b_sum = bsum ;
+        % data_samples(idx).bun_lin = bun_lin ;
+        % data_samples(idx).Rxx = Rxx;
     
-        % save collected data cumulatively after every sample
-        temp_filename = strcat('FA4/comparison_models/outputs/data_samples_compare_linear_to_minPMAC' ...
-            , int2str(idx), '.mat');
-        save(temp_filename, 'data_samples');
-    
-        Data_SIMO = [Data_SIMO, data_samples(idx)];
-        save('FA4/comparison_models/outputs/Data_SIMO.mat', 'Data_SIMO')
-
-        try
-            load FA4/comparison_models/outputs/Data_SIMO.mat
-        catch
-            clear all;
-            Data = [];
-            save FA4/comparison_models/outputs/Data_SIMO.mat
-        end
+        % % save collected data cumulatively after every sample
+        % temp_filename = strcat('FA4/comparison_models/outputs/data_samples_compare_linear_to_minPMAC' ...
+        %     , int2str(idx), '.mat');
+        % save(temp_filename, 'data_samples');
+        % 
+        % Data_SIMO = [Data_SIMO, data_samples(idx)];
+        % save('FA4/comparison_models/outputs/Data_SIMO.mat', 'Data_SIMO')
+        % 
+        % try
+        %     load FA4/comparison_models/outputs/Data_SIMO.mat
+        % catch
+        %     clear all;
+        %     Data = [];
+        %     save FA4/comparison_models/outputs/Data_SIMO.mat
+        % end
     
         idx = idx+1;
     catch

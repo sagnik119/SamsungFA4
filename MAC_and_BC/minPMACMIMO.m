@@ -83,10 +83,15 @@ bu_min = bu_min*log(2);
 
 while 1
     % solve for each tone
+    tic;
     parfor tone = 1:N
         [~, bun(:,tone), Rxxs{tone}, Eun(:,tone)] = minPtoneMIMO(H(:,:,tone), Lxu, theta, w); 
     end
+    elapsed = toc;
+    fprintf('Elapsed time Rxx update cvx: %.2f seconds.\n', elapsed);
+
     % update ellipsoid for theta
+    tic;
     g = sum(bun,2) - bu_min;                   
     % stopping criteria
     tmp_err = sqrt(g'*A*g);
@@ -98,7 +103,7 @@ while 1
     theta = theta - 1/(U + 1)*tmp;
     A = U^2/(U^2 - 1)*(A - 2/(U + 1)*(tmp*tmp'));
     ind = find(theta < zeros(U,1));
-    
+
     while ~isempty(ind) % This part is to make sure that theta is feasible,
         g = zeros(U,1); 
         g(ind(1)) = -1;
@@ -108,6 +113,14 @@ while 1
         ind = find(theta < zeros(U,1));
     end   
     count = count+1;
+    
+    % Check convergence (you can define `err` as a small positive value)
+    if norm(sum(bun, 2) - bu_min) <= err
+        break
+    end
+
+    elapsed = toc;
+    fprintf('Elapsed time theta update cvx: %.2f seconds.\n', elapsed);
 end
 
 % if max(Lxu) == 1

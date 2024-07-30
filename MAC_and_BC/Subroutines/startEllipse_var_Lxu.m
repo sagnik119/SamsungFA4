@@ -11,7 +11,7 @@
 
 % A is the matrix describing the staring ellipsoid and g is its center
 
-function [A, g] = startEllipse_var_Lxu(H, Lxu, bu_min, w)
+function [A, g] = startEllipse_var_Lxu(H, Lxu, bu_min, w, cb)
 
 
 [Ly, ~, N] = size(H);
@@ -46,7 +46,7 @@ for u = 1:U
             [~,h_tmp,M{tone}] = svd(Rnoise^(-1/2)*H(:,index_start(u1):index_end(u1),tone),0);
             gs(1:length(diag(h_tmp)),tone) = diag(h_tmp).^2;
         end
-        [~, e_tmp] = fmwaterfill_gn(reshape(gs,1,[]), b(u1)/N, 0);
+        [~, e_tmp] = fmwaterfill_gn(reshape(gs,1,[]), b(u1)/N, 0, cb);
         en_tmp = reshape(e_tmp, Lxu(u1), N);
         en(u1,:) = sum(en_tmp, 1);
         for tone = 1:N

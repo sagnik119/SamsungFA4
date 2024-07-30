@@ -74,7 +74,7 @@ fc = 2.4e9; % carrier frequency
 fft_length_range = 2.^[6]; % range of FFT lengths
 
 %%
-noise_var = 1.0/9800000; 
+noise_var = 1.0/98000; 
 
 %%
 bu_min_single_user_single_tone_range = 1:10; % to be multiplied by FFT length to get total energy per user
@@ -125,6 +125,17 @@ while idx <= num_samples
     for user=1:num_users
         [h_user, t_dly, t_dly_10ns] = get_channel(channel_type, N_tx, ...
             N_rx, index(user));
+        
+        % h_user_resampled = zeros(N_rx, N_tx, 9);
+        % for rx = 1:N_rx
+        %     for tx = 1:N_tx
+        %         h_user_resampled(rx,tx,:) = channel_resample(h_user(rx, tx,:), 100e6, 4,5, 9, 0);
+        %     end
+        % end
+        % h_user = h_user_resampled;
+
+
+        %h_user = channel_resample(h_user, 100e6, 4,5, 9, 0);
         [fad_m, fad_std] = get_fading(channel_type, dist(user), fc);
         fad_db = fad_m + randn()*fad_std;
         h_user = h_user*10^(-fad_db/20);
@@ -147,11 +158,15 @@ while idx <= num_samples
     % Applying minPMAC on generated channel with random values
 
     % Solo minPMAC without linear only
-    bu_a_lin = [640, 640, 640];
+    % bu_a_lin = [640, 640, 640];
 
-    [FEAS_FLAG, bu_a, info] = minPMACMIMO(H/sqrt(noise_var), ...
-        Lxu, bu_a_lin', ... % bit
-        w', cb);
+    % [FEAS_FLAG, bu_a, info] = minPMACMIMO_reformulated(H/sqrt(noise_var), ...
+    %     Lxu, bu_a_lin', ... % bit
+    %     w', cb);
+
+    % [FEAS_FLAG, bu_a, info] = minPMACMIMO(H/sqrt(noise_var), ...
+    %     Lxu, bu_a_lin', ... % bit
+    %     w', cb);
 
 
     % fprintf ("minPMAC finished\n");
@@ -163,30 +178,30 @@ while idx <= num_samples
     % fprintf ("maxRMAC finished\n");
 
     % Store inputs and outputs
-    data_samples(idx).N_tx = N_tx;
-    data_samples(idx).fc = fc;
-    data_samples(idx).num_taps = size(t_dly, 2);
-    data_samples(idx).num_users = num_users;
-    data_samples(idx).channel_type = channel_type;
-    data_samples(idx).N_rx = N_rx;
-    data_samples(idx).sample_index = index;
-    data_samples(idx).dist = dist;
-    data_samples(idx).fft_length = fft_length;
-    data_samples(idx).bu_min = bu_min;
-    data_samples(idx).w = w;
-    data_samples(idx).h = h;
-    data_samples(idx).H = H;
-    % data_samples(idx).Eun = Eun ;
-    % data_samples(idx).theta = theta;    
-    % data_samples(idx).bun = bun ;
-    data_samples(idx).FEAS_FLAG = FEAS_FLAG;
-    data_samples(idx).bu_a = bu_a ;
-    data_samples(idx).info = info;
-    data_samples(idx).bu_a_lin = bu_a_lin ;
-    data_samples(idx).b_sum_lin = bsum_lin ;
-    data_samples(idx).b_sum = bsum ;
-    data_samples(idx).bun_lin = bun_lin ;
-    data_samples(idx).Rxx = Rxx;
+    % data_samples(idx).N_tx = N_tx;
+    % data_samples(idx).fc = fc;
+    % data_samples(idx).num_taps = size(t_dly, 2);
+    % data_samples(idx).num_users = num_users;
+    % data_samples(idx).channel_type = channel_type;
+    % data_samples(idx).N_rx = N_rx;
+    % data_samples(idx).sample_index = index;
+    % data_samples(idx).dist = dist;
+    % data_samples(idx).fft_length = fft_length;
+    % % data_samples(idx).bu_min = bu_min;
+    % data_samples(idx).w = w;
+    % data_samples(idx).h = h;
+    % data_samples(idx).H = H;
+    % % data_samples(idx).Eun = Eun ;
+    % % data_samples(idx).theta = theta;    
+    % % data_samples(idx).bun = bun ;
+    % data_samples(idx).FEAS_FLAG = FEAS_FLAG;
+    % data_samples(idx).bu_a = bu_a ;
+    % data_samples(idx).info = info;
+    % data_samples(idx).bu_a_lin = bu_a_lin ;
+    % data_samples(idx).b_sum_lin = bsum_lin ;
+    % data_samples(idx).b_sum = bsum ;
+    % data_samples(idx).bun_lin = bun_lin ;
+    % data_samples(idx).Rxx = Rxx;
 
     % save collected data cumulatively after every sample
     temp_filename = strcat('FA4/comparison_models/outputs/data_samples_compare_linear_to_minPMACMIMO' ...
