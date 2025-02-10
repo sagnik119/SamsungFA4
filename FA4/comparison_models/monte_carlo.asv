@@ -1,0 +1,53 @@
+% Parameters
+U                  = 3;
+Ly                 = 2;
+hx                 = 1.5;
+hy                 = 3;
+fc                 = 5e9;
+BW                 = 80e6;
+fft_length         = 64;
+scenario           = 'WINNER_Indoor_A1_LOS';
+manual_fading      = 0;
+transmission_type  = 'MAC';
+verbose            = 0;
+dist               = 3;
+
+noise_var          = 3e-21;
+cb                 = 1;
+Lxu                = ones(1, U);
+Rnn                = repmat(eye(Ly), [1, 1, fft_length]);
+transmit_SNR       = 10.^((0:10:80)/10); % Multiple SNR values
+Eun_level          = transmit_SNR * noise_var;
+Eun                = eye(U);
+
+num_monte_carlo    = 10;
+
+% Pre-allocate result array: Dimensions = [num_monte_carlo, 3, number_of_SNRs]
+bu_a_lins = zeros(num_monte_carlo, 3, length(transmit_SNR));
+
+% Precompute factors that don't depend on SNR or iteration
+fft_factor = (fft_length/(fft_length + 8)) * sum(Eun, 2);
+
+% Parallel loop over Monte Carlo runs
+% Each iteration generates a channel and tests all SNR values on that channel
+parfor i = 1:num_monte_carlo
+    % Generate channel once per Monte Carlo iteration
+    H = get_channel(U, Ly, 1, hx, hy, dist, fc, BW, fft_length, ...
+                    scenario, manual_fading, transmission_type, verbose);
+    
+    inv_noise_sqrt = 1 / sqrt(noise_var);
+    H_scaled = H * inv_noise_sqrt;  % Scale H once to save computations
+    
+    % Loop over each SNR value
+    for s = 1:length(transmit_SNR)
+        fixed_gain = fft_factor * Eun_level(s);
+        
+        % Compute linear_only for the given SNR
+        [~, ~, ~, bu_a_lin, ~] = linear_only(fixed_gain, H_scaled, Lxu, Rnn, cb);
+        
+        % Store the result
+        bu_a_lins(i, :, s) = bu_a_lin;
+    end
+end
+
+% bu_a_lins now contains results for all Monte Carlo iterations and all SNR values.
