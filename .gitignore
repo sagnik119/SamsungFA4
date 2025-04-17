@@ -83,7 +83,6 @@ profile_default/
 ipython_config.py
 
 # Data
-*.mat
 *.DS_Store
 *.bin
 
