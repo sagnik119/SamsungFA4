@@ -115,7 +115,7 @@ while idx <= num_samples
     
     
     
-        % bu_min = [4.479 4.479 4.479];%5 * ones(1, num_users); % bit/Hz
+        bu_min = [4.479 4.479 4.479];%5 * ones(1, num_users); % bit/Hz
     
     
     
@@ -125,9 +125,9 @@ while idx <= num_samples
         fprintf ("Parameters: num_users: %d , N_rx: %d, fft_length: %d\n", ...
             num_users, N_rx, fft_length );
     
-        fprintf ("Generating channel\n");
-        % Uncomment on receiving samsung channels
-        % Generating channels with random values
+        % fprintf ("Generating channel\n");
+        % % Uncomment on receiving samsung channels
+        % % Generating channels with random values
         % try
         %     [h_user, t_dly, t_dly_10ns] = get_channel(channel_type, N_tx, ...
         %             N_rx, index(1)); % to get number of delay taps
@@ -172,18 +172,18 @@ while idx <= num_samples
         Lxu = ones(1, num_users);
         Rnn = repmat(eye(N_rx), [1, 1, fft_length]);
         Eun = eye(num_users);
-        [Rxx, bsum, bsum_lin, bu_a_lin, bun_lin] = linear_only(fft_length/(fft_length + 8)* ...
-            sum(Eun, 2) * Eun_level(9), H/sqrt(noise_var), ...
-            Lxu , Rnn, cb);
+        % [Rxx, bsum, bsum_lin, bu_a_lin, bun_lin] = linear_only(fft_length/(fft_length + 8)* ...
+        %     sum(Eun, 2) * Eun_level(9), H/sqrt(noise_var), ...
+        %     Lxu , Rnn, cb);
 
         % Solo minPMAC without linear only
-        % bu_a_lin = [320, 320, 320];
+        bu_a_lin = [320, 320, 320];
     
         % fprintf ("Starting minPMAC\n");
         % % Applying minPMAC on generated channel with random values
         % 
-        % [FEAS_FLAG2, bu_a2, info2] = minPMAC_reformulated(H/sqrt(noise_var), ...
-        %     bu_a_lin, w, cb);
+        [FEAS_FLAG2, bu_a2, info2] = minPMAC_reformulated(H/sqrt(noise_var), ...
+            bu_a_lin, w, cb);
 
 
         % fprintf ("minPMAC finished\n");
